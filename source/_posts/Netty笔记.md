@@ -693,11 +693,11 @@ while (iterator.hasNext()) {
   }
   ```
 
-![20210414192429](\typora-user-images\20210414192429.png)
+![20210414192429](/typora-user-images/20210414192429.png)
 
 * 当**选择器中的通道对应的事件发生后**，selecionKey会被放到发生事件集合中，这个集合只能添加不能删除，所有事件集合的**selecionKey不会自动移除**，所以需要我们在处理完一个事件后，通过迭代器手动移除其中的selecionKey。否则会导致已被处理过的事件再次被处理，就会引发错误。
 
-![](\typora-user-images\20210414193143.png)
+![](/typora-user-images/20210414193143.png)
 
 ### 断开处理
 
@@ -1240,19 +1240,19 @@ public class MultiThreadServer {
 - 等待数据阶段
 - 复制数据阶段
 
-![image-20220830211928009](\typora-user-images\image-20220830211928009.png)
+![image-20220830211928009](/typora-user-images/image-20220830211928009.png)
 
 IO模型主要分为以下几种：
 
 ### 阻塞IO：
 
-![image-20220830212113223](\typora-user-images\image-20220830212113223.png)
+![image-20220830212113223](/typora-user-images/image-20220830212113223.png)
 
 - 用户线程进行read操作时，**需要等待操作系统执行实际的read操作**，此期间用户线程是被阻塞的，无法执行其他操作
 
 ### 非阻塞IO
 
-![image-20220830215641725](\typora-user-images\image-20220830215641725.png)
+![image-20220830215641725](/typora-user-images/image-20220830215641725.png)
 
 - 用户线程在一个循环中一直调用read方法，若内核空间中还没有数据可读，立即返回
   - **只是在等待阶段非阻塞**
@@ -1260,7 +1260,7 @@ IO模型主要分为以下几种：
 
 ### 多路复用
 
-![image-20220830215701759](\typora-user-images\image-20220830215701759.png)
+![image-20220830215701759](/typora-user-images/image-20220830215701759.png)
 
 **Java中通过Selector实现多路复用**
 
@@ -1274,7 +1274,7 @@ IO模型主要分为以下几种：
 
 ### 异步IO
 
-![image-20220830220725875](\typora-user-images\image-20220830220725875.png)
+![image-20220830220725875](/typora-user-images/image-20220830220725875.png)
 
 - 线程1调用方法后理解返回，**不会被阻塞也不需要立即获取结果**
 - 当方法的运行结果出来以后，由线程2将结果**回调**给线程1
@@ -1305,7 +1305,7 @@ socket.getOutputStream().write(buf);Copy
 
 **内部工作流如下**
 
-![image-20220831222326741](\typora-user-images\image-20220831222326741.png)
+![image-20220831222326741](/typora-user-images/image-20220831222326741.png)
 
 - Java 本身并不具备 IO 读写能力，因此 read 方法调用后，要从 Java 程序的**用户态切换至内核态**，去调用操作系统（Kernel）的读能力，将数据读入**内核缓冲区**。这期间用户线程阻塞，操作系统使用 DMA（Direct Memory Access）来实现文件读，其间也不会使用 CPU
 
@@ -1331,7 +1331,7 @@ socket.getOutputStream().write(buf);Copy
 - ByteBuffer.allocateDirect(10)
   - 底层对应DirectByteBuffer，**使用的是操作系统内存**(Java和操作系统都可以使用这片内存)
 
-![image-20220831223736625](\typora-user-images\image-20220831223736625.png)
+![image-20220831223736625](/typora-user-images/image-20220831223736625.png)
 
 大部分步骤与优化前相同，唯有一点：**Java 可以使用 DirectByteBuffer 将堆外内存映射到 JVM 内存中来直接访问使用**
 
@@ -1349,7 +1349,7 @@ socket.getOutputStream().write(buf);Copy
 
 底层采用了 **linux 2.1** 后提供的 **sendFile** 方法，Java 中对应着两个 channel 调用 **transferTo/transferFrom** 方法拷贝数据
 
-![image-20220831224536869](\typora-user-images\image-20220831224536869.png)
+![image-20220831224536869](/typora-user-images/image-20220831224536869.png)
 
 - Java 调用 transferTo 方法后，要从 Java 程序的**用户态**切换至**内核态**，使用 DMA将数据读入**内核缓冲区**，不会使用 CPU
 - 数据从**内核缓冲区**传输到 **socket 缓冲区**，CPU 会参与拷贝
@@ -1364,7 +1364,7 @@ socket.getOutputStream().write(buf);Copy
 
 **linux 2.4** 对上述方法再次进行了优化
 
-![image-20220831225349512](\typora-user-images\image-20220831225349512.png)
+![image-20220831225349512](/typora-user-images/image-20220831225349512.png)
 
 - Java 调用 transferTo 方法后，要从 Java 程序的**用户态**切换至**内核态**，使用 DMA将数据读入**内核缓冲区**，不会使用 CPU
 
@@ -1562,7 +1562,7 @@ public class HelloClient {
 
 * 流程分析（左Client端右服务器端）：
 
-![image-20220904164624414](\typora-user-images\image-20220904164624414.png)
+![image-20220904164624414](/typora-user-images/image-20220904164624414.png)
 
 ## 组件解释：
 
@@ -1815,7 +1815,7 @@ defaultEventLoopGroup-2-4 hello4
 ```
 
 关系如下：
-![image-20220911174307196](\typora-user-images\image-20220911174307196.png)
+![image-20220911174307196](/typora-user-images/image-20220911174307196.png)
 
 ctx.fireChannelRead(msg);// 让消息传给下一个Handler 源码如下：
 

@@ -454,6 +454,85 @@ Android的主线程就是ActivityThread，主线程的入口方法为main，在m
 
 ActivityThread通过ApplicationThread和AMS进行进程间通信，AMS以进程间通信的方方式完成ActivityThread的请求后会回调ApplicationThread中的Binder方法，然后ApplicationThread会向H发送消息，H收到消息后会将ApplicationThread中的逻辑切换到ActivityThread中去执行，即切换到主线程中去执行，这个过程就是主线程的消息循环模型。
 
+### Handler基本结构已经了解完毕那么一定会有如下三个问题
+
+1.Android中为什么主线程不会因为Looper.loop()里的死循环卡死？ 
+
+这里涉及线程，先说说说进程/线程，**进程：**每个app运行时前首先创建一个进程，该进程是由Zygote fork出来的，用于承载App上运行的各种Activity/Service等组件。进程对于上层应用来说是完全透明的，这也是google有意为之，让App程序都是运行在Android Runtime。大多数情况一个App就运行在一个进程中，除非在AndroidManifest.xml中配置Android:process属性，或通过native代码fork进程。
+
+**线程：**线程对应用来说非常常见，比如每次new Thread().start都会创建一个新的线程。该线程与App所在进程之间资源共享，从Linux角度来说进程与线程除了是否共享资源外，并没有本质的区别，都是一个task_struct结构体**，在CPU看来进程或线程无非就是一段可执行的代码，CPU采用CFS调度算法，保证每个task都尽可能公平的享有CPU时间片**。
+
+有了这么准备，再说说死循环问题：
+
+对于线程既然是一段可执行的代码，当可执行代码执行完成后，线程生命周期便该终止了，线程退出。而对于主线程，我们是绝不希望会被运行一段时间，自己就退出，那么如何保证能一直存活呢？**简单做法就是可执行代码是能一直执行下去的，死循环便能保证不会被退出，**例如，[binder线程](https://zhida.zhihu.com/search?content_id=31574662&content_type=Answer&match_order=1&q=binder线程&zhida_source=entity)也是采用死循环的方法，通过循环方式不同与Binder驱动进行读写操作，当然并非简单地死循环，无消息时会休眠。但这里可能又引发了另一个问题，既然是死循环又如何去处理其他事务呢？通过创建新线程的方式。
+
+真正会卡死主线程的操作是在回调方法onCreate/onStart/onResume等操作时间过长，会导致掉帧，甚至发生ANR，looper.loop本身不会导致应用卡死。
+
+
+
+2.没看见哪里有相关代码为这个死循环准备了一个新线程去运转？ 
+
+事实上，会在进入死循环之前便创建了新binder线程，在代码ActivityThread.main()中：
+
+```java
+public static void main(String[] args) {
+        ....
+
+        //创建Looper和MessageQueue对象，用于处理主线程的消息
+        Looper.prepareMainLooper();
+
+        //创建ActivityThread对象
+        ActivityThread thread = new ActivityThread(); 
+
+        //建立Binder通道 (创建新线程)
+        thread.attach(false);
+
+        Looper.loop(); //消息循环运行
+        throw new RuntimeException("Main thread loop unexpectedly exited");
+    }
+```
+
+**thread.attach(false)；便会创建一个Binder线程（具体是指ApplicationThread，Binder的服务端，用于接收系统服务AMS发送来的事件），该binder线程通过Handler将Message发送给主线程**，例如看下结尾的Android系统个人总结
+
+另外，**ActivityThread实际上并非线程**，不像HandlerThread类，ActivityThread并没有真正继承Thread类，只是往往运行在主线程，该人以线程的感觉，其实承载ActivityThread的主线程就是由Zygote fork而创建的进程。
+
+**主线程的死循环一直运行是不是特别消耗CPU资源呢？** 其实不然，这里就涉及到**Linux pipe/epoll机制**，简单说就是在主线程的MessageQueue没有消息时，便阻塞在loop的queue.next()中的nativePollOnce()方法里，此时主线程会释放CPU资源进入休眠状态，直到下个消息到达或者有事务发生，通过往pipe管道写端写入数据来唤醒主线程工作。这里采用的epoll机制，是一种IO多路复用机制，可以同时监控多个描述符，当某个描述符就绪(读或写就绪)，则立刻通知相应程序进行读或写操作，本质同步I/O，即读写是阻塞的。 **所以说，主线程大多数时候都是处于休眠状态，并不会消耗大量CPU资源。**
+
+ “一般的死循环会让程序卡死，比如 while(true) 打印hello，打印到天荒地老” 这不就卡死了吗。
+
+另外 没有这个 唤醒机制 那主线程不就成了一次性的了？
+
+
+
+3.Activity的生命周期这些方法这些都是在主线程里执行的吧，那这些生命周期方法是怎么实现在死循环体外能够执行起来的？
+
+ActivityThread的内部类H继承于Handler，通过handler消息机制，简单说Handler机制用于同一个进程的线程间通信。
+
+**Activity的生命周期都是依靠主线程的Looper.loop，当收到不同Message时则采用相应措施：**
+
+在H.handleMessage(msg)方法中，根据接收到不同的msg，执行相应的生命周期。
+
+比如收到msg=H.LAUNCH_ACTIVITY，则调用ActivityThread.handleLaunchActivity()方法，最终会通过[反射机制](https://zhida.zhihu.com/search?content_id=31574662&content_type=Answer&match_order=1&q=反射机制&zhida_source=entity)，创建Activity实例，然后再执行Activity.onCreate()等方法；
+
+再比如收到msg=H.PAUSE_ACTIVITY，则调用ActivityThread.handlePauseActivity()方法，最终会执行Activity.onPause()等方法。 上述过程，只说核心逻辑讲，真正该过程远比这复杂。
+
+**主线程的消息又是哪来的呢？**当然是App进程中的其他线程通过Handler发送给主线程，请看接下来的内容：
+
+![](/typora-user-images/7fb8728164975ac86a2b0b886de2b872_r.jpg)
+
+**[system_server进程](https://zhida.zhihu.com/search?content_id=31574662&content_type=Answer&match_order=1&q=system_server进程&zhida_source=entity)是系统进程**，java framework框架的核心载体，里面运行了大量的系统服务，比如这里提供ApplicationThreadProxy（简称ATP），ActivityManagerService（简称AMS），这个两个服务都运行在system_server进程的不同线程中，由于ATP和AMS都是基于IBinder接口，都是binder线程，binder线程的创建与销毁都是由binder驱动来决定的。
+
+**App进程则是我们常说的应用程序**，主线程主要负责Activity/Service等组件的生命周期以及UI相关操作都运行在这个线程； 另外，每个App进程中至少会有两个binder线程 ApplicationThread(简称AT)和ActivityManagerProxy（简称AMP），除了图中画的线程，其中还有很多线程，比如signal catcher线程等，这里就不一一列举。
+
+Binder用于不同进程之间通信，由一个进程的Binder客户端向另一个进程的服务端发送事务，比如图中线程2向线程4发送事务；而handler用于同一个进程中不同线程的通信，比如图中线程4向主线程发送消息。
+
+**结合图说说Activity生命周期，比如暂停Activity，流程如下：**
+
+1. 线程1的AMS中调用线程2的ATP；（由于同一个进程的线程间资源共享，可以相互直接调用，但需要注意多线程并发问题）
+2. 线程2通过binder传输到App进程的线程4；
+3. 线程4通过handler消息机制，将暂停Activity的消息发送给主线程；
+4. 主线程在looper.loop()中循环遍历消息，当收到暂停Activity的消息时，便将消息分发给ActivityThread.H.handleMessage()方法，再经过方法的调用，最后便会调用到Activity.onPause()，当onPause()处理完后，继续循环loop下去。
+
 ### Android线程和线程池
 
 线程分为主线程和子线程，主线程主要处理和界面相关的事情，而子线程则往往用于执行耗时操作。由于Android的特性，如果在主线程中执行耗时操作那么就会导致程序无法及时地响应，因此耗时操作必须放在子线程中去执行。
@@ -1956,9 +2035,57 @@ JAVA无论如何代码都会走到finally{}代码块中
 
     在桌面上点击的所有APP都是Launcher请求AMS去启动该应用程序的。AMS会首先检查调用者权限，根据Intent的flag决定启动模式，最后通过binder的方式往ApplicationThread发，而ApplicationThread继承IApplicationThread.Stub，才会收到AMS的回调，ApplicationThread作为ActivityThread的内部类，因为ApplicationThread是一个Binder通信接口他在binder的线程池中不在主线程，所以要通过H的Handler消息到主线程，在主线程中启动Activity，创建Activity的上下文，通过类加载器去启动Activity，最后执行Activity的onCreate()方法。
 
-    Window分为三种窗口应用程序窗口（1-99），子窗口（1000-1999），系统窗口（2000-2999），会根据其中的type值显示窗口次序
+例如在应用中启动一个Service
 
-窗口添加过程主要是，配置视图属性，还有Flag，最后通过WindowManager的addViews（）而方法的实现在WindowManagerImpl，而WindowManagerImpl最后回到WindowManagerGlobal中，WindowManagerGlobal中维护了三个列表，view列表，布局参数列表，ViewRootImpl列表，通过addToDisplay进行Binder通信，addToDisplay调用了WMS的addWindow（），将自身作为参数（Session），每个应用程序对应一个Session，WMS通过ArrayList保存这些Session，WMS会为这个添加的窗口分配Surface，并确定显示次序，负责界面的是Surface，WMS会把管理的Surface交给SurfaceFlinger处理，SurfaceFlinger会将这些Sufrace混合并绘制到屏幕上。
+```java
+startService()； //或 binderService()
+```
+
+![image-20250120230436844](/typora-user-images/image-20250120230436844.png)
+
+当App通过调用Android API方法startService（）或binderService（）来生成并启动服务的过程，主要是由ActivityManagerService来完成的。
+
+1. ActivityManagerService通过Socket通信方式向Zygote进程请求生成(fork)用于承载服务的进程ActivityThread。此处讲述启动远程服务的过程，即服务运行于单独的进程中，对于运行本地服务则不需要启动服务的过程。ActivityThread是应用程序的主线程；ActivityManagerService通过Socket通信方式向Zygote进程请求生成(fork)用于承载服务的进程ActivityThread。 此处讲述启动远程服务的过程，即服务运行于单独的进程中，对于运行本地服务则不需要启动服务的过程。 ActivityThread是应用程序的主线程；
+2. Zygote通过fork的方法，将zygote进程复制生成新的进程，并将ActivityThread相关的资源加载到新进程；
+3. ActivityManagerService向新生成的ActivityThread进程，通过Binder方式发送生成服务的请求；
+4. ActivityThread启动运行服务;
+
+在整个startService过程，从进程角度看服务启动过程
+
+- **Process A进程：**是指调用startService命令所在的进程，也就是启动服务的发起端进程，比如点击桌面App图标，此处Process A便是Launcher所在进程。
+- **system_server进程：**系统进程，是java framework框架的核心载体，里面运行了大量的系统服务，比如这里提供ApplicationThreadProxy（简称ATP），ActivityManagerService（简称AMS），这个两个服务都运行在system_server进程的不同线程中，由于ATP和AMS都是基于IBinder接口，都是binder线程，binder线程的创建与销毁都是由binder驱动来决定的，每个进程binder线程个数的上限为16。
+- **Zygote进程：**是由`init`进程孵化而来的，用于创建Java层进程的母体，所有的Java层进程都是由Zygote进程孵化而来；
+- **Remote Service进程：**远程服务所在进程，是由Zygote进程孵化而来的用于运行Remote服务的进程。主线程主要负责Activity/Service等组件的生命周期以及UI相关操作都运行在这个线程； 另外，每个App进程中至少会有两个binder线程 ApplicationThread(简称AT)和ActivityManagerProxy（简称AMP），当然还有其他线程，这里不是重点就不提了。
+
+![](/typora-user-images/start_service_processes.jpg)
+
+图中涉及3种IPC通信方式：`Binder`、`Socket`以及`Handler`，在图中分别用3种不同的颜色来代表这3种通信方式。一般来说，同一进程内的线程间通信采用的是 [Handler消息队列机制](http://gityuan.com/2015/12/26/handler-message/)，不同进程间的通信采用的是[binder机制](http://gityuan.com/2015/10/31/binder-prepare/)，另外与Zygote进程通信采用的`Socket`。
+
+启动流程：
+
+1. Process A进程采用Binder IPC向system_server进程发起startService请求；
+2. system_server进程接收到请求后，向zygote进程发送创建进程的请求；
+3. zygote进程fork出新的子进程Remote Service进程；
+4. Remote Service进程，通过Binder IPC向sytem_server进程发起attachApplication请求；
+5. system_server进程在收到请求后，进行一系列准备工作后，再通过binder IPC向remote Service进程发送scheduleCreateService请求；
+6. Remote Service进程的binder线程在收到请求后，通过handler向主线程发送CREATE_SERVICE消息；
+7. 主线程在收到Message后，通过发射机制创建目标Service，并回调Service.onCreate()方法。
+
+到此，服务便正式启动完成。当创建的是本地服务或者服务所属进程已创建时，则无需经过上述步骤2、3，直接创建服务即可。
+
+startService的生命周期为onCreate, onStartCommand, onDestroy,流程如下图
+
+![](/typora-user-images/service_lifeline.jpg)
+
+由上图可见,造成ANR可能的原因有Binder full{step 7, 12}, MessageQueue(step 10), AMS Lock (step 13).
+
+当进程启动Service其所在进程还没有启动时, 需要先启动其目标进程,流程如下图:
+
+![](/typora-user-images/start_service_process.jpg)
+
+
+
+Window分为三种窗口应用程序窗口（1-99），子窗口（1000-1999），系统窗口（2000-2999），会根据其中的type值显示窗口次序窗口添加过程主要是，配置视图属性，还有Flag，最后通过WindowManager的addViews（）而方法的实现在WindowManagerImpl，而WindowManagerImpl最后回到WindowManagerGlobal中，WindowManagerGlobal中维护了三个列表，view列表，布局参数列表，ViewRootImpl列表，通过addToDisplay进行Binder通信，addToDisplay调用了WMS的addWindow（），将自身作为参数s（Session），每个应用程序对应一个Session，WMS通过ArrayList保存这些Session，WMS会为这个添加的窗口分配Surface，并确定显示次序，负责界面的是Surface，WMS会把管理的Surface交给SurfaceFlinger处理，SurfaceFlinger会将这些Sufrace混合并绘制到屏幕上。
 
 WMS的创建会直接调用WMS的main方法
 
