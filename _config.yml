@@ -5,10 +5,10 @@
 # Site
 title: 蒙园青Rythem的博客
 subtitle: ''
-description: ''
+description: The greatest test of courage on earth is to bear defeat without losing heart.
 keywords: 
 author: YuanqingRythem
-language: zh-cn
+language: zh-Hans
 timezone: ''
 
 # URL
@@ -96,7 +96,7 @@ ignore:
 # Extensions
 ## Plugins: https://hexo.io/plugins/
 ## Themes: https://hexo.io/themes/
-theme: geek
+theme: melody
 
 # Deployment
 ## Docs: https://hexo.io/docs/one-command-deployment
