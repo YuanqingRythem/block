@@ -2,18 +2,18 @@
 # Theme color for customize
 # Notice: color value must in double quotes like "#000" or may cause error!
 # ---------------
-# theme_color:
-#   enable: true
-#   main: "#49B1F5"
-#   paginator: "#00C4B6"
-#   button_hover: "#FF7242"
-#   text_selection: "#00C4B6"
-#   link_color: "#858585"
-#   hr_color: "#A4D8FA"
-#   tag_start_color: "#A4D8FA"
-#   tag_end_color: "#1B9EF3"
-#   header_text_color: "#EEEEEE"
-#   footer_text_color: "#EEEEEE"
+theme_color:
+  enable: true
+  main: "#3b0066"
+  paginator: "#00C4B6"
+  button_hover: "#FF7242"
+  text_selection: "#00C4B6"
+  link_color: "#858585"
+  hr_color: "#3b0066"
+  tag_start_color: "#3b0066"
+  tag_end_color: "#1B9EF3"
+  header_text_color: "#EEEEEE"
+  footer_text_color: "#EEEEEE"
 
 # Main menu navigation
 menu:
@@ -138,7 +138,7 @@ cdn:
 # ---------------
 avatar: /imgs/logo.png
 
-top_img: true # false or url of img
+top_img: /imgs/top.jpg # false or url of img
 
 top_img_height: 60 # best range: 60 - 100
 
@@ -163,7 +163,7 @@ post_copyright:
 # Please see doc for more details: https://molunerfinn.com/hexo-theme-melody-doc/theme-config.html#auto-excerpt
 auto_excerpt:
   enable: true
-  length: 150
+  length: 300
 
 # slide
 # For reveal.js config, see https://github.com/hakimel/reveal.js#configuration
@@ -299,7 +299,7 @@ busuanzi:
 # See: https://github.com/hustcc/ribbon.js
 canvas_ribbon:
   enable: true
-  size: 150
+  size: 100
   alpha: 0.6
   zIndex: -1
   click_to_change: true
@@ -308,9 +308,7 @@ canvas_ribbon:
 # ---------------
 links_title: Links   # 配置友链的标题文字
 links:
-  Molunerfinn: https://molunerfinn.com # 名称：URL
-  PiEgg: https://piegg.cn
-  Elody: https://piegg.cn
+  我的Android启蒙大神Gityuan: http://gityuan.com/archive/ # 名称：URL
 
 # Follow Me Button
 follow:
