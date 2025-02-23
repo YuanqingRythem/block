@@ -298,7 +298,7 @@ busuanzi:
 # canvas_ribbon
 # See: https://github.com/hustcc/ribbon.js
 canvas_ribbon:
-  enable: true
+  enable: false
   size: 100
   alpha: 0.6
   zIndex: -1
