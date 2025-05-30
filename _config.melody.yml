@@ -18,9 +18,9 @@ theme_color:
 # Main menu navigation
 menu:
   主页: /
-  档案: /archives
+  文章: /archives
   标签: /tags
-  类别: /categories
+  分类: /categories
   专利: /pdf/202411281267.2发明专利证书.pdf
   简历: /pdf/蒙园青-Android系统工程师-150204199808110916-大连东软信息学院.pdf
 
@@ -163,7 +163,7 @@ post_copyright:
 # Please see doc for more details: https://molunerfinn.com/hexo-theme-melody-doc/theme-config.html#auto-excerpt
 auto_excerpt:
   enable: true
-  length: 300
+  length: 200
 
 # slide
 # For reveal.js config, see https://github.com/hakimel/reveal.js#configuration
